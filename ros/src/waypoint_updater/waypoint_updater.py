@@ -4,7 +4,11 @@ import rospy
 from geometry_msgs.msg import PoseStamped
 from styx_msgs.msg import Lane, Waypoint
 
+from std_msgs.msg import Int32
+
+
 import math
+import tf
 
 '''
 This node will publish waypoints from the car's current position to some `x` distance ahead.
@@ -33,24 +37,65 @@ class WaypointUpdater(object):
 
         # TODO: Add a subscriber for /traffic_waypoint and /obstacle_waypoint below
 
+        rospy.Subscriber('/traffic_waypoint', Int32, self.traffic_cb)
 
         self.final_waypoints_pub = rospy.Publisher('final_waypoints', Lane, queue_size=1)
 
         # TODO: Add other member variables you need below
+        self.base_waypoints = None
+        self.pose = None #: Current vehicle location + orientation
+        self.frame_id = None
+        self.previous_car_index = 0 #: Where in base waypoints list the car is
+        self.traffic_index = -1 #: Where in base waypoints list the traffic light is
+        self.traffic_time_received = rospy.get_time() #: When traffic light info was received
 
-        rospy.spin()
+        self.slowdown_coefficient = 1.7
+        self.stopped_distance = 0.25
+        
+        self.loop()
+    
+    def loop(self):
+        """
+        Publishes car index and subset of waypoints with target velocities
+        """
+        rate = rospy.Rate(10)
 
+        while not rospy.is_shutdown():
+            rate.sleep()
+
+            if self.base_waypoints is None or self.pose is None or self.frame_id is None:
+                continue
+
+            # Where in base waypoints list the car is
+
+            # Get subset waypoints ahead
+            next_waypoint = self.get_next_waypoint(self.pose, self.base_waypoints)
+            
+            m = min(len(self.base_waypoints), next_waypoint + LOOKAHEAD_WPS)
+            next_waypoints = self.base_waypoints[next_waypoint:m]
+            rospy.logerr("Waypoints:%s", next_waypoint)
+
+            
+            lane = Lane()
+            lane.header.frame_id = self.frame_id
+            lane.waypoints = next_waypoints
+            lane.header.stamp = rospy.Time.now()
+            self.final_waypoints_pub.publish(lane)
+        
     def pose_cb(self, msg):
         # TODO: Implement
-        pass
+        self.pose = msg.pose 
+        self.frame_id = msg.header.frame_id
 
-    def waypoints_cb(self, waypoints):
+    def waypoints_cb(self, lane):
         # TODO: Implement
-        pass
+        self.base_waypoints = lane.waypoints
+
 
     def traffic_cb(self, msg):
         # TODO: Callback for /traffic_waypoint message. Implement
-        pass
+        self.traffic_index = msg.data
+        self.traffic_time_received = rospy.get_time()
 
     def obstacle_cb(self, msg):
         # TODO: Callback for /obstacle_waypoint message. We will implement it later
@@ -64,11 +109,47 @@ class WaypointUpdater(object):
 
     def distance(self, waypoints, wp1, wp2):
         dist = 0
-        dl = lambda a, b: math.sqrt((a.x-b.x)**2 + (a.y-b.y)**2  + (a.z-b.z)**2)
         for i in range(wp1, wp2+1):
-            dist += dl(waypoints[wp1].pose.pose.position, waypoints[i].pose.pose.position)
+            dist += self.dl(waypoints[wp1].pose.pose.position, waypoints[i].pose.pose.position)
             wp1 = i
         return dist
+    
+    # Utility functions
+    
+    def dl(self, a, b):
+        return math.sqrt((a.x-b.x)**2 + (a.y-b.y)**2  + (a.z-b.z)**2)
+    
+    #Get closest waypoint. It maybe behind us 
+    def get_closest_waypoint(self, pose, waypoints):
+    
+        min_distance = float('inf')
+        closest_waypoint = 0
+    
+        for i, waypoint in enumerate(waypoints):
+            distance = self.dl(pose.position, waypoint.pose.pose.position)
+            if distance < min_distance:
+                closest_waypoint, min_distance = i, distance
+        return closest_waypoint
+    
+    #Get the nearest waypoint which is ahead of us
+    def get_next_waypoint(self, pose, waypoints):
+        next_waypoint = self.get_closest_waypoint(pose, waypoints)
+        
+        heading = math.atan2( (waypoints[next_waypoint].pose.pose.position.y - pose.position.y), (waypoints[next_waypoint].pose.pose.position.x - pose.position.x) )
+        
+        x = pose.orientation.x
+        y = pose.orientation.y
+        z = pose.orientation.z
+        w = pose.orientation.w
+        
+        euler_angles = tf.transformations.euler_from_quaternion([x,y,z,w])
+        theta = euler_angles[-1]
+        angle = math.fabs(theta-heading)
+        if angle > math.pi / 4.0:
+            next_waypoint += 1
+
+        return next_waypoint
+        
 
 
 if __name__ == '__main__':
