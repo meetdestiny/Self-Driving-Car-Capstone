@@ -95,13 +95,6 @@ class Controller(object):
             if brake < MIN_BRAKING:
                 brake = 0.0
 
-            #rospy.logwarn('Error:    {: 04.2f}'.format(velocity_error))
-            #rospy.logwarn('Control:  {: 04.2f}'.format(control))
-            #rospy.logwarn('Throttle: {: 04.2f}'.format(throttle))
-            #rospy.logwarn('Brake:    {: 06.2f}'.format(brake))
-            #rospy.logwarn('Speed:    {: 04.2f}'.format(current_linear_velocity))
-            #rospy.logwarn('')
-
             steering = self.yaw_control.get_steering(desired_linear_velocity,
                                                      desired_angular_velocity,
                                                      current_linear_velocity)
