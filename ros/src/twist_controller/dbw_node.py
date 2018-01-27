@@ -66,7 +66,7 @@ class DBWNode(object):
             if self.dbw_enabled:
                 self.publish(throttle, brake, steering)
                 
-            rospy.logerr("DBW is :%s", self.dbw_enabled)
+            #rospy.logerr("DBW is :%s", self.dbw_enabled)
             rate.sleep()
 
     def publish(self, throttle, brake, steer):
@@ -95,6 +95,7 @@ class DBWNode(object):
 
 
     def dbw_enabled_cb(self, msg):
+        rospy.logerr("DBW is :%s", msg.data)
         self.dbw_enabled = msg.data
 
 if __name__ == '__main__':
