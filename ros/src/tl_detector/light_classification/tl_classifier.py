@@ -32,7 +32,7 @@ class TLClassifier(object):
         self.detection_scores = self.sess.graph.get_tensor_by_name('detector/detection_scores:0')
         self.i= 0
         
-        self.classifier = load_model('/home/student/Downloads/model/light_classifier_model.h5')
+       
 
     def get_classification(self, image):
         """Determines the color of the traffic light in the image
@@ -72,16 +72,21 @@ class TLClassifier(object):
             rospy.logerr("Shape of box:" + str(box.shape))              
             
             roi_box = image[int(img_size[1]*box[0]):int(img_size[1]*box[2]), int(img_size[0]*box[1]):int(img_size[0]*box[3])]
-            cv2.imwrite('/disk1/capstone/boximages/{}.jpeg'.format(self.i), roi_box)
+            output_file = '/disk1/capstone/boximages/{}.jpeg'.format(self.i)
+            cv2.imwrite(output_file, roi_box)
             
-            prediction_state = self.classifier.predict(self.reshape_image(roi_box))
+            roi_image = load_img(output_file)
+
+            classifier = load_model('/home/student/Downloads/model/light_classifier_model.h5')
+            prediction_state = classifier.predict(self.reshape_image(roi_image))
             
-            rospy.logerr("Predicted state : {} ", prediction_state)
+            rospy.logerr("Predicted state : {} ".format( prediction_state.__str__()))
             self.i= self.i + 1
         return TrafficLight.UNKNOWN
     
     def reshape_image(self,image):
-        x = img_to_array(image.resize((64, 64), Image.ANTIALIAS))
+        resized_image = image.resize((64, 64), Image.ANTIALIAS)
+        x = img_to_array(resized_image)
         return x[None, :]
 
     
