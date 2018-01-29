@@ -149,10 +149,10 @@ class TLDetector(object):
 
         cv_image = self.bridge.imgmsg_to_cv2(self.camera_image, "bgr8")
         
-        gt_image_path = os.path.join('/disk1/capstone/images','{0}.jpg'.format( self.image_number))
-        cv2.imwrite(gt_image_path,cv_image )
-        self.image_number =  self.image_number + 1
-        rospy.loginfo('saved gt data %s',gt_image_path)
+        #gt_image_path = os.path.join('/disk1/capstone/images','{0}.jpg'.format( self.image_number))
+        #cv2.imwrite(gt_image_path,cv_image )
+        #self.image_number =  self.image_number + 1
+        #rospy.loginfo('saved gt data %s',gt_image_path)
         #Get classification
         return self.light_classifier.get_classification(cv_image)
 
@@ -204,7 +204,6 @@ class TLDetector(object):
                     if tl_car_ref_x >= -1.4:
                         min_distance = dist
                         min_index = i
-            rospy.logerr('min index ={} min_distance={}\n'.format(min_index, min_distance))
           
             # If we have found a stopline which is ahead and within range of consideration, 
             #then find the nearest light to see if we need to actually stop.
@@ -220,7 +219,6 @@ class TLDetector(object):
                        min_index = i
                 
                 light = self.lights[min_index]
-                rospy.logerr('min index for light={} min_distance={}\n'.format(min_index, min_distance))
             else:
                 light = None
                 
@@ -228,7 +226,6 @@ class TLDetector(object):
         #TODO find the closest visible traffic light (if one exists)
 
         if light:
-            rospy.logerr("found at light  {}".format(str(light)))
             state = self.get_light_state(light)
             return light_wp, state
         #self.waypoints = None

@@ -30,10 +30,7 @@ class TLClassifier(object):
         self.detection_boxes = self.sess.graph.get_tensor_by_name('detector/detection_boxes:0')
         self.detection_classes = self.sess.graph.get_tensor_by_name('detector/detection_classes:0')
         self.detection_scores = self.sess.graph.get_tensor_by_name('detector/detection_scores:0')
-        self.i= 0
         
-       
-
     def get_classification(self, image):
         """Determines the color of the traffic light in the image
 
@@ -47,10 +44,8 @@ class TLClassifier(object):
         #TODO implement light color prediction
         img_expanded = np.expand_dims(image, axis=0)
 
-        rospy.logerr("Detecting traffic light")
         boxes, scores, classes = self.sess.run([self.detection_boxes, self.detection_scores, self.detection_classes],
                                  feed_dict={self.detection_input: img_expanded})
-        rospy.logerr("Detected traffic light")
 
         img_size = (image.shape[1], image.shape[0])
 
@@ -61,27 +56,29 @@ class TLClassifier(object):
         
         #Select those scores where threshold is over 0.9 
         dec_boxes = []
-        rospy.logerr("Total boxes:{}".format(str(len(detected_scores))) )
         for i, box in enumerate(detected_boxes[:len(detected_scores)]):
-            rospy.logerr("Score is:{} for class {}".format(detected_scores[i],detected_classes[i]) )
             if( detected_scores[i] <0.9):
                 continue
             # 10 is class label of traffic lights as per https://github.com/tensorflow/models/blob/master/research/object_detection/data/mscoco_label_map.pbtxt
             if( detected_classes[i] != 10) :
                 continue
-            rospy.logerr("Shape of box:" + str(box.shape))              
             
             roi_box = image[int(img_size[1]*box[0]):int(img_size[1]*box[2]), int(img_size[0]*box[1]):int(img_size[0]*box[3])]
-            output_file = '/disk1/capstone/boximages/{}.jpeg'.format(self.i)
-            cv2.imwrite(output_file, roi_box)
             
-            roi_image = load_img(output_file)
+            roi_box = cv2.cvtColor(roi_box,cv2.COLOR_BGR2RGB)
+            roi_image = Image.fromarray(roi_box)
 
             classifier = load_model('/home/student/Downloads/model/light_classifier_model.h5')
             prediction_state = classifier.predict(self.reshape_image(roi_image))
             
             rospy.logerr("Predicted state : {} ".format( prediction_state.__str__()))
-            self.i= self.i + 1
+           
+            if( prediction_state[0][1] == 1.0):
+                return TrafficLight.RED
+            if( prediction_state[0][0] == 1.0):
+                return TrafficLight.GREEN
+            
+            
         return TrafficLight.UNKNOWN
     
     def reshape_image(self,image):

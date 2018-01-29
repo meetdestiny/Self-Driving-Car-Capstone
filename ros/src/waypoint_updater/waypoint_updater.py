@@ -73,8 +73,6 @@ class WaypointUpdater(object):
             
             m = min(len(self.base_waypoints), next_waypoint + LOOKAHEAD_WPS)
             next_waypoints = self.base_waypoints[next_waypoint:m]
-            rospy.logerr("Waypoints:%s", next_waypoint)
-
             
             lane = Lane()
             lane.header.frame_id = self.frame_id
