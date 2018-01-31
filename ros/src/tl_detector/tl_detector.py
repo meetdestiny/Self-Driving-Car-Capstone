@@ -79,6 +79,7 @@ class TLDetector(object):
         self.camera_image = msg
         light_wp, state = self.process_traffic_lights()
 
+        rospy.logerr("Traffic waypoint {} with state: {}".format(light_wp,state))
         '''
         Publish upcoming red lights at camera frequency.
         Each predicted state has to occur `STATE_COUNT_THRESHOLD` number
@@ -90,7 +91,7 @@ class TLDetector(object):
             self.state = state
         elif self.state_count >= STATE_COUNT_THRESHOLD:
             self.last_state = self.state
-            light_wp = light_wp if state == TrafficLight.RED else -1
+            #light_wp = light_wp if state == TrafficLight.RED else -1
             self.last_wp = light_wp
             self.upcoming_red_light_pub.publish(Int32(light_wp))
         else:
@@ -180,7 +181,6 @@ class TLDetector(object):
         #light_ahead = self.sensor_dist
         tl_delta = 0.0
 
-
         # List of positions that correspond to the line to stop in front of for a given intersection
         stop_line_positions = self.config['stop_line_positions']
         if(self.pose):
@@ -221,11 +221,14 @@ class TLDetector(object):
                 light = self.lights[min_index]
             else:
                 light = None
-                
+            
+            print("Found light at waypoint:{}".format(min_index))
+            
 
         #TODO find the closest visible traffic light (if one exists)
 
         if light:
+            light_wp = self.get_next_waypoint(light.pose.pose)
             state = self.get_light_state(light)
             return light_wp, state
         #self.waypoints = None
