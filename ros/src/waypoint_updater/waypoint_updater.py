@@ -25,7 +25,7 @@ as well as to verify your TL classifier.
 TODO (for Yousuf and Aaron): Stopline location for each traffic light.
 '''
 
-LOOKAHEAD_WPS = 200 # Number of waypoints we will publish. You can change this number
+LOOKAHEAD_WPS = 400 # Number of waypoints we will publish. You can change this number
 MAX_DECEL     = 4.0
 STOP_BUFFER   = 5.0
 
@@ -63,7 +63,7 @@ class WaypointUpdater(object):
         """
         Publishes car index and subset of waypoints with target velocities
         """
-        rate = rospy.Rate(10)
+        rate = rospy.Rate(50)
 
         while not rospy.is_shutdown():
             rate.sleep()
@@ -82,15 +82,27 @@ class WaypointUpdater(object):
             tl_dist = self.dl(self.pose.position, self.base_waypoints[self.traffic_index].pose.pose.position)
             min_stopping_dist = self.current_velocity**2 / (2.0 * MAX_DECEL) + STOP_BUFFER
             
+            # We detected a traffic light far ahead but don't do anything yet
             lane = Lane()
             lane.header.frame_id = self.frame_id
             lane.header.stamp = rospy.Time.now()
             
-            #Brake only when we have enough space 
-            if self.traffic_index == -1 or (not self.braking and tl_dist < min_stopping_dist):
+            
+            
+            # We have not detected any traffic light or no space to brake
+            #or (not self.braking and tl_dist < min_stopping_dist)
+            if self.traffic_index == -1   :
+                rospy.logerr("Not braking because nothing detected")
                 self.braking = False
                 lane.waypoints = next_waypoints
-            else:
+            # We detected a traffic light but it is not within actionable distance    
+            elif self.braking == False and  self.traffic_index > next_waypoint + LOOKAHEAD_WPS:
+                rospy.logerr("Not braking because I am at : {} and traffic light is at : {} ".format(next_waypoint, self.traffic_index))
+                self.braking = False
+                lane.waypoints = next_waypoints 
+            # We detected a traffic light and need to brake
+            else :
+                rospy.logerr("Going to break for:{}".format(self.traffic_index))
                 self.braking = True
                 lane.waypoints = self.get_next_waypoint_velocity(next_waypoints, next_waypoint, self.traffic_index)
             
@@ -170,56 +182,45 @@ class WaypointUpdater(object):
         
     def get_next_waypoint_velocity(self, waypoints, current_waypoint, traffic_index):
         final_waypoints = []
-        for i in range(, traffic_index):
+        for i in range(current_waypoint, traffic_index):
             index = i % len(waypoints)
             wp = Waypoint()
             wp.pose.pose.position.x  = waypoints[index].pose.pose.position.x
             wp.pose.pose.position.y  = waypoints[index].pose.pose.position.y
             wp.pose.pose.position.z  = waypoints[index].pose.pose.position.z
             wp.pose.pose.orientation = waypoints[index].pose.pose.orientation
-
-            if self.braking:
+            wp.twist.twist.linear.x = 0.0
+           
+            #if self.braking:
                 # Slowly creep up to light if we have stopped short
-                dist = self.distance(self.base_waypoints, index, traffic_index)
-                if dist > STOP_BUFFER and self.current_velocity < 1.0:
-                    wp.twist.twist.linear.x = 2.0
-                elif dist < STOP_BUFFER and self.current_velocity < 1.0:
-                    wp.twist.twist.linear.x = 0.0
-                else:
-                    wp.twist.twist.linear.x = min(self.current_velocity, waypoints[index].twist.twist.linear.x)
-            else:
-                wp.twist.twist.linear.x = waypoints[index].twist.twist.linear.x
+            #    dist = self.distance(self.base_waypoints, index, traffic_index)
+            #    if dist > STOP_BUFFER and self.current_velocity < 1.0:
+            #        wp.twist.twist.linear.x = 2.0
+            #    elif dist < STOP_BUFFER and self.current_velocity < 1.0:
+            #    wp.twist.twist.linear.x = 0.0
+            #    else:
+            #        wp.twist.twist.linear.x = min(self.current_velocity, waypoints[index].twist.twist.linear.x)
+            #else:
+            #    wp.twist.twist.linear.x = waypoints[index].twist.twist.linear.x
             final_waypoints.append(wp)
 
-        if self.braking:
+        #if self.braking:
             # Find the traffic_wp index in final_waypoints to pass to decelerate
-            tl_wp = len(final_waypoints)
+        #    tl_wp = len(final_waypoints)
 
             # If we are braking set all waypoints passed traffic_wp within LOOKAHEAD_WPS to 0.0
-            for i in range(traffic_index, current_waypoint + LOOKAHEAD_WPS):
-                index = i % len(waypoints)
-                wp = Waypoint()
-                wp.pose.pose.position.x  = waypoints[index].pose.pose.position.x
-                wp.pose.pose.position.y  = waypoints[index].pose.pose.position.y
-                wp.pose.pose.position.z  = waypoints[index].pose.pose.position.z
-                wp.pose.pose.orientation = waypoints[index].pose.pose.orientation
-                wp.twist.twist.linear.x  = 0.0
-                final_waypoints.append(wp)
-            final_waypoints = self.decelerate(final_waypoints, current_waypoint, traffic_index)
+        #   for i in range(traffic_index, current_waypoint + LOOKAHEAD_WPS):
+        #        index = i % len(waypoints)
+        #        wp = Waypoint()
+        #        wp.pose.pose.position.x  = waypoints[index].pose.pose.position.x
+        #        wp.pose.pose.position.y  = waypoints[index].pose.pose.position.y
+        #        wp.pose.pose.position.z  = waypoints[index].pose.pose.position.z
+        #        wp.pose.pose.orientation = waypoints[index].pose.pose.orientation
+        #        wp.twist.twist.linear.x  = 0.0
+        #        final_waypoints.append(wp)
 
         return final_waypoints
         
-    def decelerate(self, waypoints, current_waypoint, traffic_index):
-        last = waypoints[traffic_index]
-        last.twist.twist.linear.x = 0.0
-        for wp in waypoints[:tl_wp][::-1]:
-            dist = self.distance(self.base_waypoints, current_waypoint, last)
-            dist = max(0.0, dist - STOP_BUFFER)
-            vel  = math.sqrt(2 * self.decel * dist)
-            if vel < 1.0:
-                vel = 0.0
-            wp.twist.twist.linear.x = min(vel, wp.twist.twist.linear.x)
-        return waypoints
 
 if __name__ == '__main__':
     try:
