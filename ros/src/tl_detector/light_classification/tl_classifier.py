@@ -20,8 +20,10 @@ class TLClassifier(object):
     
     def __init__(self):
         #TODO load classifier
+        cwd = os.path.dirname(os.path.realpath(__file__))
+
         detector_graph_def = tf.GraphDef()
-        with open('/home/student/CarND-Capstone/ros/src/tl_detector/light_classification/frozen_inference_graph_ssd.pb', 'rb') as f:
+        with open(cwd + '/frozen_inference_graph_ssd.pb', 'rb') as f:
             detector_graph_def.ParseFromString(f.read())
         
         self.sess =  tf.Session()
@@ -31,7 +33,7 @@ class TLClassifier(object):
         self.detection_classes = self.sess.graph.get_tensor_by_name('detector/detection_classes:0')
         self.detection_scores = self.sess.graph.get_tensor_by_name('detector/detection_scores:0')
         
-        self.classifier = load_model('/home/student/Downloads/model/light_classifier_model.h5')
+        self.classifier = load_model(cwd + '/light_classifier_model.h5')
         self.graph = tf.get_default_graph()
         self.i = 0
 
